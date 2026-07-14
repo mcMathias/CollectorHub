@@ -1,0 +1,494 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ══════════════════════════════════════════════════
+// USERS & AUTHENTICATION
+// ══════════════════════════════════════════════════
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  displayName   String
+  passwordHash  String
+  avatar        String?
+  role          UserRole  @default(USER)
+
+  // OAuth
+  googleId      String?   @unique
+  discordId     String?   @unique
+
+  // Email verification
+  emailVerified   Boolean   @default(false)
+  verifyToken     String?   @unique
+  verifyExpires   DateTime?
+
+  // Password reset
+  resetToken      String?   @unique
+  resetExpires    DateTime?
+
+  // Preferences
+  defaultCurrencyCode String @default("DKK")
+  defaultCurrency     Currency @relation(fields: [defaultCurrencyCode], references: [code])
+
+  // Status
+  isActive        Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  collections   Collection[]
+  wishlistItems WishlistItem[]
+  locations     Location[]
+  tags          Tag[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  expiresAt   DateTime
+  revoked     Boolean  @default(false)
+  userAgent   String?
+  ipAddress   String?
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ══════════════════════════════════════════════════
+// COLLECTION TYPES (Generic Architecture)
+// ══════════════════════════════════════════════════
+
+model CollectionType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  icon        String?
+  color       String?
+
+  isSystem    Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  fieldDefinitions CustomFieldDefinition[]
+  collections      Collection[]
+  categories       Category[]
+
+  @@map("collection_types")
+}
+
+model CustomFieldDefinition {
+  id           String    @id @default(uuid())
+  name         String
+  slug         String
+  fieldType    FieldType @default(TEXT)
+  description  String?
+  isRequired   Boolean   @default(false)
+  defaultValue String?
+  options      String[]  @default([])
+  sortOrder    Int       @default(0)
+
+  collectionTypeId String
+  collectionType   CollectionType @relation(fields: [collectionTypeId], references: [id], onDelete: Cascade)
+
+  customAttributes CustomAttribute[]
+
+  @@unique([collectionTypeId, slug])
+  @@index([collectionTypeId])
+  @@map("custom_field_definitions")
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DECIMAL
+  DATE
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+  URL
+  COLOR
+}
+
+// ══════════════════════════════════════════════════
+// CATEGORIES (Hierarchical under CollectionType)
+// CollectionType → Category → Item
+// Example: LEGO → Star Wars → Millennium Falcon
+// ══════════════════════════════════════════════════
+
+model Category {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String
+  description String?
+  icon        String?
+  sortOrder   Int     @default(0)
+
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+
+  collectionTypeId String
+  collectionType   CollectionType @relation(fields: [collectionTypeId], references: [id], onDelete: Cascade)
+
+  items       Item[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([collectionTypeId, slug])
+  @@index([collectionTypeId])
+  @@index([parentId])
+  @@map("categories")
+}
+
+// ══════════════════════════════════════════════════
+// LOCATIONS (Hierarchical)
+// Example: Hus → Kontor → Reol 2 → Hylde 3
+// ══════════════════════════════════════════════════
+
+model Location {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  icon        String?
+
+  parentId    String?
+  parent      Location?  @relation("LocationTree", fields: [parentId], references: [id])
+  children    Location[] @relation("LocationTree")
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items       Item[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([userId])
+  @@index([parentId])
+  @@map("locations")
+}
+
+// ══════════════════════════════════════════════════
+// TAGS (Proper model — searchable, filterable)
+// ══════════════════════════════════════════════════
+
+model Tag {
+  id     String  @id @default(uuid())
+  name   String
+  color  String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items  ItemTag[]
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("tags")
+}
+
+model ItemTag {
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, tagId])
+  @@map("item_tags")
+}
+
+// ══════════════════════════════════════════════════
+// CURRENCIES
+// ══════════════════════════════════════════════════
+
+model Currency {
+  id     String @id @default(uuid())
+  code   String @unique
+  name   String
+  symbol String
+
+  users              User[]
+  itemsPurchase      Item[]  @relation("PurchaseCurrency")
+  itemsEstimated     Item[]  @relation("EstimatedCurrency")
+  wishlistItems      WishlistItem[]
+  valueSnapshots     ValueSnapshot[]
+  itemValueHistories ItemValueHistory[]
+
+  @@map("currencies")
+}
+
+// ══════════════════════════════════════════════════
+// COLLECTIONS
+// ══════════════════════════════════════════════════
+
+model Collection {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  icon        String?
+  coverImage  String?
+  visibility  Visibility @default(PRIVATE)
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  collectionTypeId String
+  collectionType   CollectionType @relation(fields: [collectionTypeId], references: [id])
+
+  items          Item[]
+  valueSnapshots ValueSnapshot[]
+
+  @@index([userId])
+  @@index([collectionTypeId])
+  @@map("collections")
+}
+
+enum Visibility {
+  PRIVATE
+  PUBLIC
+}
+
+// ══════════════════════════════════════════════════
+// ITEMS
+// ══════════════════════════════════════════════════
+
+model Item {
+  id             String          @id @default(uuid())
+  title          String
+  subtitle       String?
+  brand          String?
+
+  // Pricing with currency relations (no typos possible)
+  purchasePrice      Decimal?    @db.Decimal(12, 2)
+  purchaseCurrencyCode String    @default("DKK")
+  purchaseCurrency   Currency    @relation("PurchaseCurrency", fields: [purchaseCurrencyCode], references: [code])
+
+  estimatedValue     Decimal?    @db.Decimal(12, 2)
+  estimatedCurrencyCode String   @default("DKK")
+  estimatedCurrency  Currency    @relation("EstimatedCurrency", fields: [estimatedCurrencyCode], references: [code])
+
+  purchaseDate   DateTime?
+  condition      ItemCondition?
+  quantity       Int             @default(1)
+  description    String?
+  notes          String?
+  barcode        String?
+  serialNumber   String?
+
+  // Ownership status
+  ownership      OwnershipStatus @default(OWNED)
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  // Relations
+  collectionId   String
+  collection     Collection      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  categoryId     String?
+  category       Category?       @relation(fields: [categoryId], references: [id])
+
+  locationId     String?
+  location       Location?       @relation(fields: [locationId], references: [id])
+
+  images           ItemImage[]
+  customAttributes CustomAttribute[]
+  tags             ItemTag[]
+  valueHistory     ItemValueHistory[]
+
+  @@index([collectionId])
+  @@index([categoryId])
+  @@index([locationId])
+  @@index([ownership])
+  @@map("items")
+}
+
+enum ItemCondition {
+  MINT
+  NEAR_MINT
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum OwnershipStatus {
+  OWNED
+  WISHLIST
+  SOLD
+  TRADED
+  LOANED
+  RESERVED
+}
+
+// ══════════════════════════════════════════════════
+// CUSTOM ATTRIBUTES (Key-Value per Item)
+// ══════════════════════════════════════════════════
+
+model CustomAttribute {
+  id     String @id @default(uuid())
+  value  String
+
+  fieldDefinitionId String
+  fieldDefinition   CustomFieldDefinition @relation(fields: [fieldDefinitionId], references: [id], onDelete: Cascade)
+
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, fieldDefinitionId])
+  @@index([itemId])
+  @@map("custom_attributes")
+}
+
+// ══════════════════════════════════════════════════
+// IMAGES (0..N per item, with metadata)
+// ══════════════════════════════════════════════════
+
+model ItemImage {
+  id        String      @id @default(uuid())
+  url       String
+  key       String
+  isPrimary Boolean     @default(false)
+  sortOrder Int         @default(0)
+  label     ImageLabel?
+
+  // Metadata for optimization, dedup, thumbnails
+  width     Int?
+  height    Int?
+  size      Int?
+  mimeType  String?
+  hash      String?
+
+  itemId    String
+  item      Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime    @default(now())
+  deletedAt DateTime?
+
+  @@index([itemId])
+  @@index([hash])
+  @@map("item_images")
+}
+
+enum ImageLabel {
+  FRONT
+  BACK
+  BOX
+  RECEIPT
+  CLOSEUP
+  CERTIFICATE
+  OTHER
+}
+
+// ══════════════════════════════════════════════════
+// ITEM VALUE HISTORY (per item price tracking)
+// Foundation for graphs, profit/loss, price trends
+// ══════════════════════════════════════════════════
+
+model ItemValueHistory {
+  id           String   @id @default(uuid())
+  value        Decimal  @db.Decimal(12, 2)
+  currencyCode String   @default("DKK")
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+  source       String?
+  note         String?
+  date         DateTime @db.Date
+
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+
+  @@index([itemId])
+  @@index([date])
+  @@map("item_value_history")
+}
+
+// ══════════════════════════════════════════════════
+// COLLECTION VALUE SNAPSHOTS (daily aggregation)
+// For portfolio-level graphs
+// ══════════════════════════════════════════════════
+
+model ValueSnapshot {
+  id           String   @id @default(uuid())
+  totalValue   Decimal  @db.Decimal(14, 2)
+  currencyCode String   @default("DKK")
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+  itemCount    Int
+  date         DateTime @db.Date
+
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, date])
+  @@index([collectionId])
+  @@map("value_snapshots")
+}
+
+// ══════════════════════════════════════════════════
+// WISHLIST
+// ══════════════════════════════════════════════════
+
+model WishlistItem {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?
+  category     String?
+  targetPrice  Decimal? @db.Decimal(12, 2)
+  currencyCode String   @default("DKK")
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+  priority     Priority @default(MEDIUM)
+  url          String?
+  image        String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("wishlist_items")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
