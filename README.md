@@ -111,6 +111,44 @@ docker exec collectorhub-storage mc anonymous set download local/collectorhub
 
 ---
 
+## Fresh Setup on New PC
+
+If you clone this project on a different computer (e.g., home PC), run everything from scratch:
+
+```bash
+# 1. Clone
+git clone https://github.com/mcMathias/CollectorHub.git
+cd CollectorHub
+
+# 2. Environment
+cp .env.example .env
+# Edit .env → set your SMTP_PASS (Resend API key)
+
+# 3. Docker (PostgreSQL + MinIO)
+docker compose up -d
+
+# 4. Backend
+cd backend
+npm install
+npx prisma migrate dev --name init
+npx prisma db seed
+npx nest build && node dist/src/main.js
+
+# 5. Frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+
+# 6. MinIO bucket access (one-time)
+docker exec collectorhub-storage mc anonymous set download local/collectorhub
+```
+
+**Requirements:** Node.js 22+, Docker Desktop, npm, Git.
+
+Everything runs on `localhost` — no IP or network dependencies.
+
+---
+
 ## URLs
 
 | Service | URL |
