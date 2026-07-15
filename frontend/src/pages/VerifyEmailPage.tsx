@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Typography, CircularProgress, Card, CardContent, Button } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ErrorOutlinedIcon from '@mui/icons-material/ErrorOutlined';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -68,7 +68,7 @@ export default function VerifyEmailPage() {
 
           {status === 'error' && (
             <>
-              <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+              <ErrorOutlinedIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
               <Typography variant="h5" fontWeight={700} gutterBottom>
                 Verification Failed
               </Typography>

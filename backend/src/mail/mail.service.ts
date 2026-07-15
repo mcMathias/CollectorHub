@@ -14,15 +14,19 @@ export class MailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
+    const port = parseInt(this.configService.get<string>('SMTP_PORT', '465'), 10);
+
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('SMTP_HOST', 'smtp.gmail.com'),
-      port: this.configService.get<number>('SMTP_PORT', 587),
-      secure: false,
+      host: this.configService.get<string>('SMTP_HOST', 'smtp.resend.com'),
+      port,
+      secure: port === 465,
       auth: {
         user: this.configService.get<string>('SMTP_USER'),
         pass: this.configService.get<string>('SMTP_PASS'),
       },
     });
+
+    this.logger.log(`Mail configured: ${this.configService.get('SMTP_HOST')}:${port} (secure: ${port === 465})`);
   }
 
   async sendMail(options: SendMailOptions): Promise<void> {
@@ -36,8 +40,8 @@ export class MailService {
         html: options.html,
       });
       this.logger.log(`Email sent to ${options.to}: ${options.subject}`);
-    } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}`, error);
+    } catch (error: any) {
+      this.logger.error(`Failed to send email to ${options.to}: ${error.message}`, error.stack);
       // Don't throw — email failures shouldn't break the user flow
     }
   }

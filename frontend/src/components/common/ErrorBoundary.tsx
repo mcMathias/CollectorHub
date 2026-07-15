@@ -1,6 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Box, Typography, Button, Card, CardContent } from '@mui/material';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ErrorOutlinedIcon from '@mui/icons-material/ErrorOutlined';
 
 interface Props {
   children: ReactNode;
@@ -45,7 +45,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         >
           <Card sx={{ maxWidth: 480, width: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <CardContent sx={{ textAlign: 'center', py: 6, px: 4 }}>
-              <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+              <ErrorOutlinedIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
               <Typography variant="h5" fontWeight={700} gutterBottom>
                 Something went wrong
               </Typography>
