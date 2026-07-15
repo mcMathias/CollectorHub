@@ -312,6 +312,7 @@ export default function CollectionDetailPage() {
         onSubmit={handleCreate}
         isLoading={createMutation.isPending}
         collectionId={id!}
+        fieldDefinitions={collection?.collectionType?.fieldDefinitions}
       />
 
       <ItemFormDialog
@@ -321,6 +322,7 @@ export default function CollectionDetailPage() {
         isLoading={updateMutation.isPending}
         item={editingItem}
         collectionId={id!}
+        fieldDefinitions={collection?.collectionType?.fieldDefinitions}
       />
 
       <DeleteItemDialog

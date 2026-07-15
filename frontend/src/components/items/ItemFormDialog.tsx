@@ -10,8 +10,12 @@ import {
   Stack,
   Grid,
   InputAdornment,
+  Typography,
+  Divider,
 } from '@mui/material';
 import type { Item, CreateItemInput, UpdateItemInput } from '../../api/items';
+import type { FieldDefinition } from '../../api/collections';
+import DynamicFieldsForm from './DynamicFieldsForm';
 
 const CONDITIONS = [
   { value: 'MINT', label: 'Mint' },
@@ -51,6 +55,7 @@ interface ItemFormDialogProps {
   isLoading: boolean;
   item?: Item | null;
   collectionId: string;
+  fieldDefinitions?: FieldDefinition[];
 }
 
 const emptyForm = {
@@ -75,9 +80,11 @@ export default function ItemFormDialog({
   isLoading,
   item,
   collectionId,
+  fieldDefinitions,
 }: ItemFormDialogProps) {
   const isEdit = !!item;
   const [form, setForm] = useState(emptyForm);
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (item) {
@@ -95,8 +102,18 @@ export default function ItemFormDialog({
         ownership: item.ownership || 'OWNED',
         notes: item.notes || '',
       });
+      if (item.customAttributes) {
+        const cv: Record<string, string> = {};
+        item.customAttributes.forEach((attr) => {
+          cv[attr.fieldDefinition.id] = attr.value;
+        });
+        setCustomValues(cv);
+      } else {
+        setCustomValues({});
+      }
     } else {
       setForm(emptyForm);
+      setCustomValues({});
     }
   }, [item, open]);
 
@@ -123,6 +140,13 @@ export default function ItemFormDialog({
     if (form.quantity) data.quantity = parseInt(form.quantity, 10);
     data.ownership = form.ownership;
     if (form.notes) data.notes = form.notes;
+
+    const customAttrs = Object.entries(customValues)
+      .filter(([, v]) => v !== '' && v !== undefined)
+      .map(([fieldDefinitionId, value]) => ({ fieldDefinitionId, value }));
+    if (customAttrs.length > 0) {
+      data.customAttributes = customAttrs;
+    }
 
     onSubmit(data as CreateItemInput | UpdateItemInput);
   };
@@ -288,6 +312,20 @@ export default function ItemFormDialog({
             onChange={handleChange('notes')}
             placeholder="Any additional notes..."
           />
+
+          {fieldDefinitions && fieldDefinitions.length > 0 && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
+                Type-specific Fields
+              </Typography>
+              <DynamicFieldsForm
+                fieldDefinitions={fieldDefinitions}
+                values={customValues}
+                onChange={(fieldId, value) => setCustomValues((prev) => ({ ...prev, [fieldId]: value }))}
+              />
+            </>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>

@@ -43,6 +43,18 @@ export interface Item {
   category: { id: string; name: string } | null;
   location: { id: string; name: string } | null;
   _count?: { images: number };
+  customAttributes?: {
+    id: string;
+    value: string;
+    fieldDefinition: {
+      id: string;
+      name: string;
+      slug: string;
+      fieldType: string;
+      options: string[];
+      isRequired: boolean;
+    };
+  }[];
 }
 
 export interface ItemsResponse {
@@ -83,6 +95,7 @@ export interface CreateItemInput {
   description?: string;
   notes?: string;
   tags?: string[];
+  customAttributes?: { fieldDefinitionId: string; value: string }[];
 }
 
 export interface UpdateItemInput {
@@ -100,6 +113,7 @@ export interface UpdateItemInput {
   description?: string;
   notes?: string;
   tags?: string[];
+  customAttributes?: { fieldDefinitionId: string; value: string }[];
 }
 
 export function useItems(collectionId: string, params?: ItemQueryParams) {

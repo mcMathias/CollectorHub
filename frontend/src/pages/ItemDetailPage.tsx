@@ -201,6 +201,25 @@ export default function ItemDetailPage() {
                     <Typography variant="body2">{item.location.name}</Typography>
                   </Box>
                 )}
+
+                {item.customAttributes && item.customAttributes.length > 0 && (
+                  <>
+                    <Divider />
+                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
+                      Type-specific Fields
+                    </Typography>
+                    {item.customAttributes.map((attr) => (
+                      <Box key={attr.id}>
+                        <Typography variant="caption" color="text.secondary">{attr.fieldDefinition.name}</Typography>
+                        <Typography variant="body2">
+                          {attr.fieldDefinition.fieldType === 'BOOLEAN'
+                            ? (attr.value === 'true' ? '✓ Yes' : '✗ No')
+                            : attr.value}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </>
+                )}
               </Stack>
             </CardContent>
           </Card>
