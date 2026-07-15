@@ -6,10 +6,11 @@ import {
   Delete,
   Body,
   Param,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { ItemsService } from './items.service';
-import { CreateItemDto, UpdateItemDto } from './dto';
+import { CreateItemDto, UpdateItemDto, QueryItemsDto } from './dto';
 import { CurrentUser } from '../common/decorators';
 
 @ApiTags('Items')
@@ -20,6 +21,9 @@ export class ItemsController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new item' })
+  @ApiResponse({ status: 201, description: 'Item created successfully' })
+  @ApiResponse({ status: 404, description: 'Collection not found' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async create(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateItemDto,
@@ -28,16 +32,20 @@ export class ItemsController {
   }
 
   @Get('collection/:collectionId')
-  @ApiOperation({ summary: 'Get all items in a collection' })
+  @ApiOperation({ summary: 'Get all items in a collection (paginated)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of items' })
   async findAllByCollection(
     @Param('collectionId') collectionId: string,
     @CurrentUser('id') userId: string,
+    @Query() query: QueryItemsDto,
   ) {
-    return this.itemsService.findAllByCollection(collectionId, userId);
+    return this.itemsService.findAllByCollection(collectionId, userId, query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get item by ID' })
+  @ApiResponse({ status: 200, description: 'Item details' })
+  @ApiResponse({ status: 404, description: 'Item not found' })
   async findOne(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -47,6 +55,7 @@ export class ItemsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update item' })
+  @ApiResponse({ status: 200, description: 'Item updated successfully' })
   async update(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -56,7 +65,8 @@ export class ItemsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete item' })
+  @ApiOperation({ summary: 'Soft delete item' })
+  @ApiResponse({ status: 200, description: 'Item deleted successfully' })
   async remove(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,

@@ -1,19 +1,40 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateItemDto, UpdateItemDto } from './dto';
+import { CreateItemDto, UpdateItemDto, QueryItemsDto } from './dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ItemsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly itemIncludes = {
+    images: { orderBy: { sortOrder: 'asc' as const }, where: { deletedAt: null } },
+    tags: { include: { tag: true } },
+    category: true,
+    location: true,
+    purchaseCurrency: true,
+    estimatedCurrency: true,
+    customAttributes: {
+      include: { fieldDefinition: true },
+    },
+  };
+
+  private readonly itemListIncludes = {
+    images: { orderBy: { sortOrder: 'asc' as const }, where: { deletedAt: null }, take: 1 },
+    tags: { include: { tag: true } },
+    category: true,
+    location: true,
+    purchaseCurrency: true,
+    estimatedCurrency: true,
+    _count: { select: { images: true } },
+  };
+
   async create(userId: string, dto: CreateItemDto) {
-    // Verify collection belongs to user
     const collection = await this.prisma.collection.findUnique({
       where: { id: dto.collectionId },
     });
 
-    if (!collection) {
+    if (!collection || collection.deletedAt) {
       throw new NotFoundException('Collection not found');
     }
 
@@ -35,8 +56,7 @@ export class ItemsService {
       ...itemData
     } = dto;
 
-    // Handle tags — create if not exist, connect
-    let tagConnections: { tagId: string; itemId: string }[] | undefined;
+    let tagConnections: { tagId: string }[] | undefined;
     if (tags?.length) {
       const tagRecords = await Promise.all(
         tags.map((name) =>
@@ -47,15 +67,15 @@ export class ItemsService {
           }),
         ),
       );
-      tagConnections = tagRecords.map((t) => ({ tagId: t.id, itemId: '' }));
+      tagConnections = tagRecords.map((t) => ({ tagId: t.id }));
     }
 
     const item = await this.prisma.item.create({
       data: {
         ...itemData,
         collection: { connect: { id: collectionId } },
-        purchasePrice: purchasePrice ? new Prisma.Decimal(purchasePrice) : null,
-        estimatedValue: estimatedValue ? new Prisma.Decimal(estimatedValue) : null,
+        purchasePrice: purchasePrice != null ? new Prisma.Decimal(purchasePrice) : null,
+        estimatedValue: estimatedValue != null ? new Prisma.Decimal(estimatedValue) : null,
         purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
         purchaseCurrency: { connect: { code: purchaseCurrencyCode || 'DKK' } },
         estimatedCurrency: { connect: { code: estimatedCurrencyCode || 'DKK' } },
@@ -74,31 +94,23 @@ export class ItemsService {
         tags: tagConnections
           ? {
               createMany: {
-                data: tagConnections.map((t) => ({ tagId: t.tagId })),
+                data: tagConnections,
               },
             }
           : undefined,
       },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        tags: { include: { tag: true } },
-        category: true,
-        location: true,
-        customAttributes: {
-          include: { fieldDefinition: true },
-        },
-      },
+      include: this.itemIncludes,
     });
 
     return item;
   }
 
-  async findAllByCollection(collectionId: string, userId: string) {
+  async findAllByCollection(collectionId: string, userId: string, query: QueryItemsDto) {
     const collection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
     });
 
-    if (!collection) {
+    if (!collection || collection.deletedAt) {
       throw new NotFoundException('Collection not found');
     }
 
@@ -106,17 +118,48 @@ export class ItemsService {
       throw new ForbiddenException('Access denied');
     }
 
-    return this.prisma.item.findMany({
-      where: { collectionId },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        tags: { include: { tag: true } },
-        category: true,
-        location: true,
-        _count: { select: { images: true } },
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ItemWhereInput = {
+      collectionId,
+      deletedAt: null,
+      ...(query.search && {
+        title: { contains: query.search, mode: 'insensitive' as const },
+      }),
+      ...(query.condition && { condition: query.condition }),
+      ...(query.ownership && { ownership: query.ownership }),
+      ...(query.categoryId && { categoryId: query.categoryId }),
+      ...(query.locationId && { locationId: query.locationId }),
+    };
+
+    const allowedSortFields = ['title', 'createdAt', 'purchasePrice', 'estimatedValue', 'condition', 'updatedAt'];
+    const sortBy = allowedSortFields.includes(query.sortBy || '') ? query.sortBy! : 'createdAt';
+    const sortOrder = query.sortOrder || 'desc';
+
+    const [data, total] = await Promise.all([
+      this.prisma.item.findMany({
+        where,
+        include: this.itemListIncludes,
+        orderBy: { [sortBy]: sortOrder },
+        skip,
+        take: limit,
+      }),
+      this.prisma.item.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
   async findById(id: string, userId: string) {
@@ -124,18 +167,11 @@ export class ItemsService {
       where: { id },
       include: {
         collection: { select: { id: true, name: true, userId: true, visibility: true } },
-        images: { orderBy: { sortOrder: 'asc' } },
-        tags: { include: { tag: true } },
-        category: true,
-        location: true,
-        customAttributes: {
-          include: { fieldDefinition: true },
-          orderBy: { fieldDefinition: { sortOrder: 'asc' } },
-        },
+        ...this.itemIncludes,
       },
     });
 
-    if (!item) {
+    if (!item || item.deletedAt) {
       throw new NotFoundException('Item not found');
     }
 
@@ -152,7 +188,7 @@ export class ItemsService {
       include: { collection: { select: { userId: true } } },
     });
 
-    if (!item) {
+    if (!item || item.deletedAt) {
       throw new NotFoundException('Item not found');
     }
 
@@ -162,7 +198,6 @@ export class ItemsService {
 
     const { customAttributes, purchasePrice, estimatedValue, purchaseDate, tags, purchaseCurrencyCode, estimatedCurrencyCode, categoryId, locationId, ...itemData } = dto;
 
-    // Update item
     const updated = await this.prisma.item.update({
       where: { id },
       data: {
@@ -175,23 +210,12 @@ export class ItemsService {
         categoryId: categoryId !== undefined ? categoryId : undefined,
         locationId: locationId !== undefined ? locationId : undefined,
       },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        tags: { include: { tag: true } },
-        category: true,
-        location: true,
-        customAttributes: {
-          include: { fieldDefinition: true },
-        },
-      },
+      include: this.itemIncludes,
     });
 
-    // Update tags if provided
     if (tags !== undefined) {
-      // Remove existing tags
       await this.prisma.itemTag.deleteMany({ where: { itemId: id } });
 
-      // Create/connect new tags
       if (tags.length) {
         const tagRecords = await Promise.all(
           tags.map((name) =>
@@ -209,7 +233,6 @@ export class ItemsService {
       }
     }
 
-    // Update custom attributes if provided
     if (customAttributes?.length) {
       for (const attr of customAttributes) {
         await this.prisma.customAttribute.upsert({
@@ -229,7 +252,7 @@ export class ItemsService {
       }
     }
 
-    return updated;
+    return this.findById(id, userId);
   }
 
   async remove(id: string, userId: string) {
@@ -238,7 +261,7 @@ export class ItemsService {
       include: { collection: { select: { userId: true } } },
     });
 
-    if (!item) {
+    if (!item || item.deletedAt) {
       throw new NotFoundException('Item not found');
     }
 
@@ -246,7 +269,10 @@ export class ItemsService {
       throw new ForbiddenException('Access denied');
     }
 
-    await this.prisma.item.delete({ where: { id } });
+    await this.prisma.item.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
 
     return { message: 'Item deleted successfully' };
   }
