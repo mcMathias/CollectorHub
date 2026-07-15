@@ -28,9 +28,13 @@ async function bootstrap() {
   // Logging interceptor
   app.useGlobalInterceptors(new LoggingInterceptor());
 
-  // CORS
+  // CORS — supports multiple origins for production
+  const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim());
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   });
 

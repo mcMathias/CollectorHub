@@ -10,6 +10,7 @@ import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import theme from './theme';
 import { AuthProvider } from './contexts/AuthContext';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import App from './App';
 
 const queryClient = new QueryClient({
@@ -27,9 +28,11 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <ErrorBoundary>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </BrowserRouter>
     </QueryClientProvider>

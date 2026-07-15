@@ -129,6 +129,12 @@ export default function LoginPage() {
             </Box>
 
             <Typography variant="body2" color="text.secondary">
+              <Link component={RouterLink} to="/forgot-password" underline="hover">
+                Forgot password?
+              </Link>
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary">
               Don't have an account?{' '}
               <Link component={RouterLink} to="/register" underline="hover">
                 Sign up

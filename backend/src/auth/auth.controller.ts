@@ -10,7 +10,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto } from './dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 import { Public } from '../common/decorators';
 
 @ApiTags('Authentication')
@@ -81,8 +81,8 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset email' })
-  async forgotPassword(@Body('email') email: string) {
-    return this.authService.forgotPassword(email);
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
   }
 
   @Public()
@@ -91,8 +91,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Reset password with token' })
   async resetPassword(
     @Param('token') token: string,
-    @Body('password') password: string,
+    @Body() dto: ResetPasswordDto,
   ) {
-    return this.authService.resetPassword(token, password);
+    return this.authService.resetPassword(token, dto.password);
   }
 }
