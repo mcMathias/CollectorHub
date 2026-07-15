@@ -15,6 +15,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Item } from '../../api/items';
 
 const conditionColors: Record<string, string> = {
@@ -43,12 +44,14 @@ function formatPrice(value: string | null, currency: { symbol: string; code: str
 
 interface ItemCardProps {
   item: Item;
+  collectionId: string;
   onEdit: (item: Item) => void;
   onDelete: (item: Item) => void;
 }
 
-export default function ItemCard({ item, onEdit, onDelete }: ItemCardProps) {
+export default function ItemCard({ item, collectionId, onEdit, onDelete }: ItemCardProps) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const navigate = useNavigate();
 
   return (
     <Card
@@ -64,7 +67,7 @@ export default function ItemCard({ item, onEdit, onDelete }: ItemCardProps) {
           boxShadow: '0 8px 24px rgba(108, 99, 255, 0.15)',
         },
       }}
-      onClick={() => onEdit(item)}
+      onClick={() => navigate(`/collections/${collectionId}/items/${item.id}`)}
     >
       <CardContent sx={{ flex: 1, p: 2.5 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">

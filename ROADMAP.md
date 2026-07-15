@@ -7,8 +7,8 @@
 | ✅ | Registrering og login | Register, login, JWT refresh, logout |
 | ✅ | Opret samlinger | Collection CRUD med type, visibility |
 | ✅ | Dashboard | Stats cards, collection overview |
-| ⬜ | Opret objekter | Item CRUD med custom fields, tags, currency, location |
-| ⬜ | Upload billeder | Multi-image upload til MinIO S3, metadata, labels |
+| ✅ | Opret objekter | Item CRUD med custom fields, tags, currency, location |
+| ✅ | Upload billeder | Multi-image upload til MinIO S3, metadata, labels |
 | ⬜ | Søgning | Full-text search across items and collections |
 | ⬜ | Filtrering | Filter by condition, tags, price range, location |
 
@@ -51,4 +51,4 @@ Opret samlinger ──→ Del offentlige samlinger
 
 ---
 
-*Sidst opdateret: 2026-07-14*
+*Sidst opdateret: 2026-07-15*

@@ -8,7 +8,7 @@ import {
   TextField,
   MenuItem,
   Stack,
-  Grid2 as Grid,
+  Grid,
   InputAdornment,
 } from '@mui/material';
 import type { Item, CreateItemInput, UpdateItemInput } from '../../api/items';

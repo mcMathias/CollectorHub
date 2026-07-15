@@ -7,7 +7,7 @@ import {
   Stack,
   TextField,
   MenuItem,
-  Grid2 as Grid,
+  Grid,
   Card,
   CardContent,
   Skeleton,
@@ -283,6 +283,7 @@ export default function CollectionDetailPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={item.id}>
                 <ItemCard
                   item={item}
+                  collectionId={id!}
                   onEdit={(i) => setEditingItem(i)}
                   onDelete={(i) => setDeletingItem(i)}
                 />
